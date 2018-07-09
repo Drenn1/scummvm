@@ -128,13 +128,13 @@ static const Plugin *detectPlugin() {
 	printf("User picked target '%s' (gameid '%s')...\n", ConfMan.getActiveDomainName().c_str(), gameid.c_str());
 	printf("  Looking for a plugin supporting this gameid... ");
 
- 	GameDescriptor game = EngineMan.findGame(gameid, &plugin);
+	PlainGameDescriptor game = EngineMan.findGame(gameid, &plugin);
 
 	if (plugin == 0) {
 		printf("failed\n");
 		warning("%s is an invalid gameid. Use the --list-games option to list supported gameid", gameid.c_str());
 	} else {
-		printf("%s\n  Starting '%s'\n", plugin->getName(), game.description().c_str());
+		printf("%s\n  Starting '%s'\n", plugin->getName(), game.description);
 	}
 
 	return plugin;
@@ -171,7 +171,7 @@ static Common::Error runGame(const Plugin *plugin, OSystem &system, const Common
 	if (err.getCode() == Common::kNoError) {
 		const MetaEngine &metaEngine = plugin->get<MetaEngine>();
 		// Set default values for all of the custom engine options
-		// Appareantly some engines query them in their constructor, thus we
+		// Apparently some engines query them in their constructor, thus we
 		// need to set this up before instance creation.
 		const ExtraGuiOptions engineOptions = metaEngine.getExtraGuiOptions(Common::String());
 		for (uint i = 0; i < engineOptions.size(); i++) {
@@ -193,13 +193,10 @@ static Common::Error runGame(const Plugin *plugin, OSystem &system, const Common
 			dir.getPath().c_str()
 			);
 
-		// Autoadded is set only when no path was provided and
-		// the game is run from command line.
-		//
-		// Thus, we remove this garbage entry
-		//
-		// Fixes bug #1544799
-		if (ConfMan.hasKey("autoadded")) {
+		// If a temporary target failed to launch, remove it from the configuration manager
+		// so it not visible in the launcher.
+		// Temporary targets are created when starting games from the command line using the game id.
+		if (ConfMan.hasKey("id_came_from_command_line")) {
 			ConfMan.removeGameDomain(ConfMan.getActiveDomainName().c_str());
 		}
 
@@ -210,7 +207,10 @@ static Common::Error runGame(const Plugin *plugin, OSystem &system, const Common
 	Common::String caption(ConfMan.get("description"));
 
 	if (caption.empty()) {
-		caption = EngineMan.findGame(ConfMan.get("gameid")).description();
+		PlainGameDescriptor game = EngineMan.findGame(ConfMan.get("gameid"));
+		if (game.description) {
+			caption = game.description;
+		}
 	}
 	if (caption.empty())
 		caption = ConfMan.getActiveDomainName(); // Use the domain (=target) name
@@ -296,6 +296,8 @@ static void setupGraphics(OSystem &system) {
 			system.setFeatureState(OSystem::kFeatureFullscreenMode, ConfMan.getBool("fullscreen"));
 		if (ConfMan.hasKey("filtering"))
 			system.setFeatureState(OSystem::kFeatureFilteringMode, ConfMan.getBool("filtering"));
+		if (ConfMan.hasKey("stretch_mode"))
+			system.setStretchMode(ConfMan.get("stretch_mode").c_str());
 	system.endGFXTransaction();
 
 	// When starting up launcher for the first time, the user might have specified

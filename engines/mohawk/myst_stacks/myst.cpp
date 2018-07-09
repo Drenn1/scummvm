@@ -23,6 +23,7 @@
 #include "mohawk/cursors.h"
 #include "mohawk/myst.h"
 #include "mohawk/myst_areas.h"
+#include "mohawk/myst_card.h"
 #include "mohawk/myst_graphics.h"
 #include "mohawk/myst_state.h"
 #include "mohawk/myst_sound.h"
@@ -30,14 +31,15 @@
 #include "mohawk/myst_stacks/myst.h"
 
 #include "common/events.h"
+#include "common/math.h"
 #include "common/system.h"
 #include "common/textconsole.h"
 
 namespace Mohawk {
 namespace MystStacks {
 
-Myst::Myst(MohawkEngine_Myst *vm) :
-		MystScriptParser(vm),
+Myst::Myst(MohawkEngine_Myst *vm, MystStack stackId) :
+		MystScriptParser(vm, stackId),
 		_state(_vm->_gameState->_myst),
 		_towerRotationCenter(Common::Point(383, 124)) {
 	setupOpcodes();
@@ -107,7 +109,7 @@ Myst::Myst(MohawkEngine_Myst *vm) :
 	}
 
 	_butterfliesMoviePlayed = false;
-	_state.treeLastMoveTime = _vm->_system->getMillis();
+	_state.treeLastMoveTime = _vm->getTotalPlayTime();
 
 	_rocketPianoSound = 0;
 	_rocketSlider1 = nullptr;
@@ -1077,7 +1079,7 @@ void Myst::o_imagerChangeSelection(uint16 var, const ArgumentsArray &args) {
 		_state.imagerSelection = 10 * d1 + d2;
 		_state.imagerActive = 0;
 
-		_vm->redrawArea(var);
+		_vm->getCard()->redrawArea(var);
 	}
 }
 
@@ -1101,7 +1103,7 @@ void Myst::o_dockVaultOpen(uint16 var, const ArgumentsArray &args) {
 			_dockVaultState = 1;
 
 		_vm->_sound->playEffect(soundId);
-		_vm->redrawArea(41, false);
+		_vm->getCard()->redrawArea(41, false);
 		animatedUpdate(ArgumentsArray(args.begin() + 3, directionalUpdateDataSize), delay);
 	}
 }
@@ -1124,7 +1126,7 @@ void Myst::o_dockVaultClose(uint16 var, const ArgumentsArray &args) {
 			_dockVaultState = 0;
 
 		_vm->_sound->playEffect(soundId);
-		_vm->redrawArea(41, false);
+		_vm->getCard()->redrawArea(41, false);
 		animatedUpdate(ArgumentsArray(args.begin() + 3, directionalUpdateDataSize), delay);
 	}
 }
@@ -1238,7 +1240,7 @@ void Myst::o_clockWheelsExecute(uint16 var, const ArgumentsArray &args) {
 		_vm->waitUntilMovieEnds(gears);
 
 		_state.clockTowerBridgeOpen = 1;
-		_vm->redrawArea(12);
+		_vm->getCard()->redrawArea(12);
 	} else if (_state.clockTowerBridgeOpen && !correctTime) {
 		_vm->_sound->playEffect(soundId);
 		_vm->wait(500);
@@ -1251,7 +1253,7 @@ void Myst::o_clockWheelsExecute(uint16 var, const ArgumentsArray &args) {
 		_vm->waitUntilMovieEnds(gears);
 
 		_state.clockTowerBridgeOpen = 0;
-		_vm->redrawArea(12);
+		_vm->getCard()->redrawArea(12);
 	}
 }
 
@@ -1341,7 +1343,7 @@ void Myst::o_imagerEraseButton(uint16 var, const ArgumentsArray &args) {
 
 	if (_imagerValidationStep == 0) {
 		// Validation script is not running, run it
-		_startTime = _vm->_system->getMillis() + 100;
+		_startTime = _vm->getTotalPlayTime() + 100;
 		_imagerValidationRunning = true;
 		return;
 	} else if (_imagerValidationStep < 7) {
@@ -1379,7 +1381,7 @@ void Myst::o_imagerEraseButton(uint16 var, const ArgumentsArray &args) {
 }
 
 void Myst::imagerValidation_run() {
-	uint32 time = _vm->_system->getMillis();
+	uint32 time = _vm->getTotalPlayTime();
 
 	if (time > _startTime) {
 		_imagerRedButton->drawConditionalDataToScreen(1);
@@ -1464,7 +1466,7 @@ void Myst::o_generatorButtonPressed(uint16 var, const ArgumentsArray &args) {
 	}
 
 	// Redraw button
-	_vm->redrawArea(button->getImageSwitchVar());
+	_vm->getCard()->redrawArea(button->getImageSwitchVar());
 
 	// Blow breaker
 	if (_state.generatorVoltage > 59)
@@ -1472,9 +1474,9 @@ void Myst::o_generatorButtonPressed(uint16 var, const ArgumentsArray &args) {
 }
 
 void Myst::generatorRedrawRocket() {
-	_vm->redrawArea(64);
-	_vm->redrawArea(65);
-	_vm->redrawArea(97);
+	_vm->getCard()->redrawArea(64);
+	_vm->getCard()->redrawArea(65);
+	_vm->getCard()->redrawArea(97);
 }
 
 void Myst::generatorButtonValue(MystArea *button, uint16 &mask, uint16 &value) {
@@ -1536,7 +1538,7 @@ void Myst::o_cabinSafeChangeDigit(uint16 var, const ArgumentsArray &args) {
 
 	_state.cabinSafeCombination = 100 * d1 + 10 * d2 + d3;
 
-	_vm->redrawArea(var);
+	_vm->getCard()->redrawArea(var);
 }
 
 void Myst::o_cabinSafeHandleStartMove(uint16 var, const ArgumentsArray &args) {
@@ -1579,7 +1581,7 @@ void Myst::o_cabinSafeHandleEndMove(uint16 var, const ArgumentsArray &args) {
 	// Used on Card 4100
 	MystVideoInfo *handle = getInvokingResource<MystVideoInfo>();
 	handle->drawFrame(0);
-	_vm->checkCursorHints();
+	_vm->refreshCursor();
 }
 
 void Myst::o_observatoryMonthChangeStartIncrease(uint16 var, const ArgumentsArray &args) {
@@ -1619,7 +1621,7 @@ void Myst::observatoryMonthChangeStart(bool increase) {
 	observatoryIncrementMonth(_observatoryIncrement);
 
 	// Start persistent script
-	_startTime = _vm->_system->getMillis();
+	_startTime = _vm->getTotalPlayTime();
 	_observatoryMonthChanging = true;
 }
 
@@ -1630,7 +1632,7 @@ void Myst::observatoryIncrementMonth(int16 increment) {
 		_state.observatoryMonthSetting = newMonth;
 
 		// Redraw digits
-		_vm->redrawArea(73);
+		_vm->getCard()->redrawArea(73);
 
 		// Update slider
 		_observatoryMonthSlider->setPosition(94 + 94 * _state.observatoryMonthSetting / 11);
@@ -1644,7 +1646,7 @@ void Myst::observatoryIncrementMonth(int16 increment) {
 }
 
 void Myst::observatoryMonthChange_run() {
-	if (_startTime + 500 < _vm->_system->getMillis())
+	if (_startTime + 500 < _vm->getTotalPlayTime())
 		observatoryIncrementMonth(_observatoryIncrement);
 }
 
@@ -1685,7 +1687,7 @@ void Myst::observatoryDayChangeStart(bool increase) {
 	observatoryIncrementDay(_observatoryIncrement);
 
 	// Start persistent script
-	_startTime = _vm->_system->getMillis();
+	_startTime = _vm->getTotalPlayTime();
 	_observatoryDayChanging = true;
 }
 
@@ -1696,11 +1698,15 @@ void Myst::observatoryIncrementDay(int16 increment) {
 		_state.observatoryDaySetting = newDay;
 
 		// Redraw digits
-		_vm->redrawArea(75);
-		_vm->redrawArea(74);
+		_vm->getCard()->redrawArea(75);
+		_vm->getCard()->redrawArea(74);
 
 		// Update slider
-		_observatoryDaySlider->setPosition(91 + 3 * _state.observatoryDaySetting);
+		// WORKAROUND: Have the day setting increment at 315/100 rather than x3 so that the slider
+		// will reach the bottom spot on day 31st. Only relevant when using the down button and
+		// not dragging the slider. Fixes Trac#10572. The original engine incremented it with x3 
+		// and has this bug, but it is less noticeable.
+		_observatoryDaySlider->setPosition(91 + (_state.observatoryDaySetting * 315) / 100 );
 		_observatoryDaySlider->restoreBackground();
 		_observatoryDaySlider->drawConditionalDataToScreen(2);
 		_state.observatoryDaySlider = _observatoryDaySlider->_pos.y;
@@ -1711,7 +1717,7 @@ void Myst::observatoryIncrementDay(int16 increment) {
 }
 
 void Myst::observatoryDayChange_run() {
-	if (_startTime + 500 < _vm->_system->getMillis())
+	if (_startTime + 500 < _vm->getTotalPlayTime())
 		observatoryIncrementDay(_observatoryIncrement);
 }
 
@@ -1744,7 +1750,7 @@ void Myst::observatoryYearChangeStart(bool increase) {
 	observatoryIncrementYear(_observatoryIncrement);
 
 	// Start persistent script
-	_startTime = _vm->_system->getMillis();
+	_startTime = _vm->getTotalPlayTime();
 	_observatoryYearChanging = true;
 }
 
@@ -1755,10 +1761,10 @@ void Myst::observatoryIncrementYear(int16 increment) {
 		_state.observatoryYearSetting = newYear;
 
 		// Redraw digits
-		_vm->redrawArea(79);
-		_vm->redrawArea(78);
-		_vm->redrawArea(77);
-		_vm->redrawArea(76);
+		_vm->getCard()->redrawArea(79);
+		_vm->getCard()->redrawArea(78);
+		_vm->getCard()->redrawArea(77);
+		_vm->getCard()->redrawArea(76);
 
 		// Update slider
 		_observatoryYearSlider->setPosition(94 + 94 * _state.observatoryYearSetting / 9999);
@@ -1772,7 +1778,7 @@ void Myst::observatoryIncrementYear(int16 increment) {
 }
 
 void Myst::observatoryYearChange_run() {
-	if (_startTime + 500 < _vm->_system->getMillis())
+	if (_startTime + 500 < _vm->getTotalPlayTime())
 		observatoryIncrementYear(_observatoryIncrement);
 }
 
@@ -1805,7 +1811,7 @@ void Myst::observatoryTimeChangeStart(bool increase) {
 	observatoryIncrementTime(_observatoryIncrement);
 
 	// Start persistent script
-	_startTime = _vm->_system->getMillis();
+	_startTime = _vm->getTotalPlayTime();
 	_observatoryTimeChanging = true;
 }
 
@@ -1816,14 +1822,14 @@ void Myst::observatoryIncrementTime(int16 increment) {
 		_state.observatoryTimeSetting = newTime;
 
 		// Redraw digits
-		_vm->redrawArea(80);
-		_vm->redrawArea(81);
-		_vm->redrawArea(82);
-		_vm->redrawArea(83);
+		_vm->getCard()->redrawArea(80);
+		_vm->getCard()->redrawArea(81);
+		_vm->getCard()->redrawArea(82);
+		_vm->getCard()->redrawArea(83);
 
 		// Draw AM/PM
 		if (!observatoryIsDDMMYYYY2400()) {
-			_vm->redrawArea(88);
+			_vm->getCard()->redrawArea(88);
 		}
 
 		// Update slider
@@ -1838,7 +1844,7 @@ void Myst::observatoryIncrementTime(int16 increment) {
 }
 
 void Myst::observatoryTimeChange_run() {
-	if (_startTime + 500 < _vm->_system->getMillis())
+	if (_startTime + 500 < _vm->getTotalPlayTime())
 		observatoryIncrementTime(_observatoryIncrement);
 }
 
@@ -1852,12 +1858,12 @@ void Myst::o_observatoryGoButton(uint16 var, const ArgumentsArray &args) {
 		_vm->_sound->playEffect(soundId);
 
 		int16 distance = _state.observatoryYearTarget - _state.observatoryYearSetting;
-		uint32 end = _vm->_system->getMillis() + 32 * ABS(distance) / 50 + 800;
+		uint32 end = _vm->getTotalPlayTime() + 32 * ABS(distance) / 50 + 800;
 
-		while (end > _vm->_system->getMillis()) {
+		while (end > _vm->getTotalPlayTime()) {
 			_vm->wait(50);
 
-			observatoryUpdateVisualizer(_vm->_rnd->getRandomNumber(409), _vm->_rnd->getRandomNumber(409));
+			observatoryUpdateVisualizer(_vm->_rnd->getRandomNumber(406), _vm->_rnd->getRandomNumber(406));
 
 			_vm->redrawResource(_observatoryVisualizer);
 		}
@@ -1870,7 +1876,7 @@ void Myst::o_observatoryGoButton(uint16 var, const ArgumentsArray &args) {
 
 		// Redraw button
 		_tempVar = 0;
-		_vm->redrawArea(105);
+		_vm->getCard()->redrawArea(105);
 	}
 }
 
@@ -1948,8 +1954,8 @@ void Myst::o_circuitBreakerMove(uint16 var, const ArgumentsArray &args) {
 
 void Myst::o_circuitBreakerEndMove(uint16 var, const ArgumentsArray &args) {
 	MystVideoInfo *breaker = getInvokingResource<MystVideoInfo>();
-	_vm->redrawArea(breaker->getImageSwitchVar());
-	_vm->checkCursorHints();
+	_vm->getCard()->redrawArea(breaker->getImageSwitchVar());
+	_vm->refreshCursor();
 }
 
 void Myst::o_boilerIncreasePressureStart(uint16 var, const ArgumentsArray &args) {
@@ -1964,12 +1970,12 @@ void Myst::o_boilerLightPilot(uint16 var, const ArgumentsArray &args) {
 	// Match is lit
 	if (_cabinMatchState == 1) {
 		_state.cabinPilotLightLit = 1;
-		_vm->redrawArea(98);
+		_vm->getCard()->redrawArea(98);
 
 		boilerFireUpdate(false);
 
 		// Put out match
-		_matchGoOutTime = _vm->_system->getMillis();
+		_matchGoOutTime = _vm->getTotalPlayTime();
 
 		if (_state.cabinValvePosition > 0)
 			_vm->_sound->playBackground(8098, 49152);
@@ -1980,7 +1986,7 @@ void Myst::o_boilerLightPilot(uint16 var, const ArgumentsArray &args) {
 			Common::Rational rate = boilerComputeGaugeRate(_state.cabinValvePosition, delay);
 			boilerResetGauge(rate);
 
-			_state.treeLastMoveTime = _vm->_system->getMillis();
+			_state.treeLastMoveTime = _vm->getTotalPlayTime();
 		}
 	}
 }
@@ -1995,7 +2001,7 @@ Common::Rational Myst::boilerComputeGaugeRate(uint16 pressure, uint32 delay) {
 
 void Myst::boilerResetGauge(const Common::Rational &rate) {
 	if (!_cabinGaugeMovie || _cabinGaugeMovie->endOfVideo()) {
-		if (_vm->getCurCard() == 4098) {
+		if (_vm->getCard()->getId() == 4098) {
 			_cabinGaugeMovie = _vm->playMovie("cabingau", kMystStack);
 			_cabinGaugeMovie->moveTo(243, 96);
 		} else {
@@ -2017,7 +2023,11 @@ void Myst::boilerResetGauge(const Common::Rational &rate) {
 void Myst::o_boilerIncreasePressureStop(uint16 var, const ArgumentsArray &args) {
 	_treeStopped = false;
 	_boilerPressureIncreasing = false;
-	_state.treeLastMoveTime = _vm->_system->getMillis();
+	_state.treeLastMoveTime = _vm->getTotalPlayTime();
+
+	while (_vm->_sound->isEffectPlaying()) {
+		_vm->doFrame();
+	}
 
 	if (_state.cabinPilotLightLit == 1) {
 		if (_state.cabinValvePosition > 0)
@@ -2042,7 +2052,7 @@ void Myst::boilerPressureIncrease_run() {
 			boilerFireUpdate(false);
 
 			// Draw fire
-			_vm->redrawArea(305);
+			_vm->getCard()->redrawArea(305);
 		} else if (_state.cabinValvePosition == 25) {
 			if (_state.cabinPilotLightLit == 1)
 				_vm->_sound->playBackground(8098, 49152);
@@ -2054,7 +2064,7 @@ void Myst::boilerPressureIncrease_run() {
 		_vm->_sound->playEffect(5098);
 
 		// Redraw wheel
-		_vm->redrawArea(99);
+		_vm->getCard()->redrawArea(99);
 	}
 }
 
@@ -2067,14 +2077,14 @@ void Myst::boilerPressureDecrease_run() {
 			boilerFireUpdate(false);
 
 			// Draw fire
-			_vm->redrawArea(305);
+			_vm->getCard()->redrawArea(305);
 		}
 
 		// Pressure increasing sound
 		_vm->_sound->playEffect(5098);
 
 		// Redraw wheel
-		_vm->redrawArea(99);
+		_vm->getCard()->redrawArea(99);
 	}
 }
 
@@ -2088,7 +2098,11 @@ void Myst::o_boilerDecreasePressureStart(uint16 var, const ArgumentsArray &args)
 void Myst::o_boilerDecreasePressureStop(uint16 var, const ArgumentsArray &args) {
 	_treeStopped = false;
 	_boilerPressureDecreasing = false;
-	_state.treeLastMoveTime = _vm->_system->getMillis();
+	_state.treeLastMoveTime = _vm->getTotalPlayTime();
+
+	while (_vm->_sound->isEffectPlaying()) {
+		_vm->doFrame();
+	}
 
 	if (_state.cabinPilotLightLit == 1) {
 		if (_state.cabinValvePosition > 0)
@@ -2114,7 +2128,7 @@ void Myst::o_basementIncreasePressureStart(uint16 var, const ArgumentsArray &arg
 void Myst::o_basementIncreasePressureStop(uint16 var, const ArgumentsArray &args) {
 	_treeStopped = false;
 	_basementPressureIncreasing = false;
-	_state.treeLastMoveTime = _vm->_system->getMillis();
+	_state.treeLastMoveTime = _vm->getTotalPlayTime();
 }
 
 void Myst::basementPressureIncrease_run() {
@@ -2126,7 +2140,7 @@ void Myst::basementPressureIncrease_run() {
 		_vm->_sound->playEffect(4642);
 
 		// Redraw wheel
-		_vm->redrawArea(99);
+		_vm->getCard()->redrawArea(99);
 	}
 }
 
@@ -2139,7 +2153,7 @@ void Myst::basementPressureDecrease_run() {
 		_vm->_sound->playEffect(4642);
 
 		// Redraw wheel
-		_vm->redrawArea(99);
+		_vm->getCard()->redrawArea(99);
 	}
 }
 
@@ -2151,7 +2165,7 @@ void Myst::o_basementDecreasePressureStart(uint16 var, const ArgumentsArray &arg
 void Myst::o_basementDecreasePressureStop(uint16 var, const ArgumentsArray &args) {
 	_treeStopped = false;
 	_basementPressureDecreasing = false;
-	_state.treeLastMoveTime = _vm->_system->getMillis();
+	_state.treeLastMoveTime = _vm->getTotalPlayTime();
 }
 
 void Myst::tree_run() {
@@ -2171,7 +2185,7 @@ void Myst::tree_run() {
 		if ((_state.treePosition < 12 && !goingDown)
 				|| (_state.treePosition > _treeMinPosition && goingDown)) {
 			uint16 delay = treeNextMoveDelay(pressure);
-			uint32 time = _vm->_system->getMillis();
+			uint32 time = _vm->getTotalPlayTime();
 			if (delay < time - _state.treeLastMoveTime) {
 
 				// Tree movement
@@ -2184,7 +2198,7 @@ void Myst::tree_run() {
 				}
 
 				// Stop background music if going up from book room
-				if (_vm->getCurCard() == 4630) {
+				if (_vm->getCard()->getId() == 4630) {
 					if (_state.treePosition > 0)
 						_vm->_sound->stopBackground();
 					else
@@ -2192,7 +2206,7 @@ void Myst::tree_run() {
 				}
 
 				// Redraw tree
-				_vm->redrawArea(72);
+				_vm->getCard()->redrawArea(72);
 
 				// Check if alcove is accessible
 				treeSetAlcoveAccessible();
@@ -2235,7 +2249,7 @@ void Myst::o_rocketSoundSliderMove(uint16 var, const ArgumentsArray &args) {
 }
 
 void Myst::o_rocketSoundSliderEndMove(uint16 var, const ArgumentsArray &args) {
-	_vm->checkCursorHints();
+	_vm->refreshCursor();
 
 	if (_state.generatorVoltage == 59 && !_state.generatorBreakers && _rocketSliderSound)
 		_vm->_sound->stopEffect();
@@ -2382,7 +2396,7 @@ void Myst::o_rocketPianoMove(uint16 var, const ArgumentsArray &args) {
 	_vm->_gfx->copyImageSectionToScreen(key->getSubImage(0).wdib, src, dest);
 
 	if (piano.contains(mouse)) {
-		MystArea *resource = _vm->forceUpdateClickedResource();
+		MystArea *resource = _vm->getCard()->forceUpdateClickedResource(mouse);
 		if (resource && resource->hasType(kMystAreaDrag)) {
 			// Press new key
 			key = static_cast<MystAreaDrag *>(resource);
@@ -2472,7 +2486,7 @@ void Myst::o_rocketLeverMove(uint16 var, const ArgumentsArray &args) {
 void Myst::o_rocketLeverEndMove(uint16 var, const ArgumentsArray &args) {
 	MystVideoInfo *lever = getInvokingResource<MystVideoInfo>();
 
-	_vm->checkCursorHints();
+	_vm->refreshCursor();
 	_rocketLeverPosition = 0;
 	lever->drawFrame(0);
 }
@@ -2480,7 +2494,7 @@ void Myst::o_rocketLeverEndMove(uint16 var, const ArgumentsArray &args) {
 void Myst::o_cabinLeave(uint16 var, const ArgumentsArray &args) {
 	// If match is lit, put out
 	if (_cabinMatchState == 1) {
-		_matchGoOutTime = _vm->_system->getMillis();
+		_matchGoOutTime = _vm->getTotalPlayTime();
 	} else if (_cabinMatchState == 0) {
 		_vm->setMainCursor(_savedCursorId);
 		_cabinMatchState = 2;
@@ -2517,7 +2531,7 @@ void Myst::o_observatoryMonthSliderStartMove(uint16 var, const ArgumentsArray &a
 }
 
 void Myst::o_observatoryMonthSliderEndMove(uint16 var, const ArgumentsArray &args) {
-	_vm->checkCursorHints();
+	_vm->refreshCursor();
 	_vm->_sound->resumeBackground();
 
 	observatoryUpdateMonth();
@@ -2533,7 +2547,7 @@ void Myst::observatoryUpdateMonth() {
 		_vm->wait(20);
 
 		// Redraw digits
-		_vm->redrawArea(73);
+		_vm->getCard()->redrawArea(73);
 	}
 }
 
@@ -2545,7 +2559,7 @@ void Myst::o_observatoryDaySliderStartMove(uint16 var, const ArgumentsArray &arg
 }
 
 void Myst::o_observatoryDaySliderEndMove(uint16 var, const ArgumentsArray &args) {
-	_vm->checkCursorHints();
+	_vm->refreshCursor();
 	_vm->_sound->resumeBackground();
 
 	observatoryUpdateDay();
@@ -2561,8 +2575,8 @@ void Myst::observatoryUpdateDay() {
 		_vm->wait(20);
 
 		// Redraw digits
-		_vm->redrawArea(75);
-		_vm->redrawArea(74);
+		_vm->getCard()->redrawArea(75);
+		_vm->getCard()->redrawArea(74);
 	}
 }
 
@@ -2574,7 +2588,7 @@ void Myst::o_observatoryYearSliderStartMove(uint16 var, const ArgumentsArray &ar
 }
 
 void Myst::o_observatoryYearSliderEndMove(uint16 var, const ArgumentsArray &args) {
-	_vm->checkCursorHints();
+	_vm->refreshCursor();
 	_vm->_sound->resumeBackground();
 
 	observatoryUpdateYear();
@@ -2590,10 +2604,10 @@ void Myst::observatoryUpdateYear() {
 		_vm->wait(20);
 
 		// Redraw digits
-		_vm->redrawArea(79);
-		_vm->redrawArea(78);
-		_vm->redrawArea(77);
-		_vm->redrawArea(76);
+		_vm->getCard()->redrawArea(79);
+		_vm->getCard()->redrawArea(78);
+		_vm->getCard()->redrawArea(77);
+		_vm->getCard()->redrawArea(76);
 	}
 }
 
@@ -2605,7 +2619,7 @@ void Myst::o_observatoryTimeSliderStartMove(uint16 var, const ArgumentsArray &ar
 }
 
 void Myst::o_observatoryTimeSliderEndMove(uint16 var, const ArgumentsArray &args) {
-	_vm->checkCursorHints();
+	_vm->refreshCursor();
 	_vm->_sound->resumeBackground();
 
 	observatoryUpdateTime();
@@ -2621,33 +2635,33 @@ void Myst::observatoryUpdateTime() {
 		_vm->wait(20);
 
 		// Redraw digits
-		_vm->redrawArea(80);
-		_vm->redrawArea(81);
-		_vm->redrawArea(82);
-		_vm->redrawArea(83);
+		_vm->getCard()->redrawArea(80);
+		_vm->getCard()->redrawArea(81);
+		_vm->getCard()->redrawArea(82);
+		_vm->getCard()->redrawArea(83);
 
 		// Draw AM/PM
 		if (!observatoryIsDDMMYYYY2400())
-			_vm->redrawArea(88);
+			_vm->getCard()->redrawArea(88);
 	}
 }
 
 void Myst::o_libraryBookPageTurnStartLeft(uint16 var, const ArgumentsArray &args) {
 	_tempVar = -1;
 	libraryBookPageTurnLeft();
-	_startTime = _vm->_system->getMillis();
+	_startTime = _vm->getTotalPlayTime();
 	_libraryBookPagesTurning = true;
 }
 
 void Myst::o_libraryBookPageTurnStartRight(uint16 var, const ArgumentsArray &args) {
 	_tempVar = 1;
 	libraryBookPageTurnRight();
-	_startTime = _vm->_system->getMillis();
+	_startTime = _vm->getTotalPlayTime();
 	_libraryBookPagesTurning = true;
 }
 
 void Myst::libraryBook_run() {
-	uint32 time = _vm->_system->getMillis();
+	uint32 time = _vm->getTotalPlayTime();
 	if (time >= _startTime + 500) {
 		if (_tempVar > 0) {
 			libraryBookPageTurnRight();
@@ -2675,12 +2689,12 @@ void Myst::o_cabinMatchLight(uint16 var, const ArgumentsArray &args) {
 		_vm->setMainCursor(kLitMatchCursor);
 
 		// Match will stay lit for one minute
-		_matchGoOutTime = _vm->_system->getMillis() + 60 * 1000;
+		_matchGoOutTime = _vm->getTotalPlayTime() + 60 * 1000;
 	}
 }
 
 void Myst::matchBurn_run() {
-	uint32 time = _vm->_system->getMillis();
+	uint32 time = _vm->getTotalPlayTime();
 
 	if (time > _matchGoOutTime) {
 		_matchGoOutTime = time + 150;
@@ -2706,12 +2720,12 @@ void Myst::matchBurn_run() {
 void Myst::o_courtyardBoxEnter(uint16 var, const ArgumentsArray &args) {
 	_tempVar = 1;
 	_vm->_sound->playEffect(_courtyardBoxSound);
-	_vm->redrawArea(var);
+	_vm->getCard()->redrawArea(var);
 }
 
 void Myst::o_courtyardBoxLeave(uint16 var, const ArgumentsArray &args) {
 	_tempVar = 0;
-	_vm->redrawArea(var);
+	_vm->getCard()->redrawArea(var);
 }
 
 void Myst::o_clockMinuteWheelStartTurn(uint16 var, const ArgumentsArray &args) {
@@ -2731,7 +2745,7 @@ void Myst::o_clockHourWheelStartTurn(uint16 var, const ArgumentsArray &args) {
 
 void Myst::clockWheel_run() {
 	// Turn wheel one step each second
-	uint32 time = _vm->_system->getMillis();
+	uint32 time = _vm->getTotalPlayTime();
 
 	if (time > _startTime + 1000) {
 		_startTime = time;
@@ -2741,7 +2755,7 @@ void Myst::clockWheel_run() {
 		else
 			clockWheelTurn(38);
 
-		_vm->redrawArea(37);
+		_vm->getCard()->redrawArea(37);
 	}
 }
 
@@ -2758,11 +2772,11 @@ void Myst::clockWheelStartTurn(uint16 wheel) {
 	else
 		clockWheelTurn(38);
 
-	_vm->redrawArea(37);
+	_vm->getCard()->redrawArea(37);
 
 	// Continue turning wheel until mouse button is released
 	_clockTurningWheel = wheel;
-	_startTime = _vm->_system->getMillis();
+	_startTime = _vm->getTotalPlayTime();
 }
 
 void Myst::clockWheelTurn(uint16 var) {
@@ -2778,14 +2792,14 @@ void Myst::clockWheelTurn(uint16 var) {
 void Myst::o_libraryCombinationBookStartRight(uint16 var, const ArgumentsArray &args) {
 	_tempVar = 0;
 	libraryCombinationBookTurnRight();
-	_startTime = _vm->_system->getMillis();
+	_startTime = _vm->getTotalPlayTime();
 	_libraryCombinationBookPagesTurning = true;
 }
 
 void Myst::o_libraryCombinationBookStartLeft(uint16 var, const ArgumentsArray &args) {
 	_tempVar = 0;
 	libraryCombinationBookTurnLeft();
-	_startTime = _vm->_system->getMillis();
+	_startTime = _vm->getTotalPlayTime();
 	_libraryCombinationBookPagesTurning = true;
 }
 
@@ -2838,7 +2852,7 @@ void Myst::libraryCombinationBookTurnRight() {
 }
 
 void Myst::libraryCombinationBook_run() {
-	uint32 time = _vm->_system->getMillis();
+	uint32 time = _vm->getTotalPlayTime();
 	if (time >= _startTime + 500) {
 		if (_tempVar > 0) {
 			libraryCombinationBookTurnRight();
@@ -2877,12 +2891,12 @@ void Myst::o_dockVaultForceClose(uint16 var, const ArgumentsArray &args) {
 		// Open switch
 		_state.dockMarkerSwitch = 1;
 		_vm->_sound->playEffect(4143);
-		_vm->redrawArea(4);
+		_vm->getCard()->redrawArea(4);
 
 		// Close vault
 		_dockVaultState = 0;
 		_vm->_sound->playEffect(soundId);
-		_vm->redrawArea(41, false);
+		_vm->getCard()->redrawArea(41, false);
 		animatedUpdate(ArgumentsArray(args.begin() + 3, directionalUpdateDataSize), delay);
 	}
 }
@@ -3027,7 +3041,7 @@ void Myst::clockGearsCheckSolution() {
 		// Gear opening video
 		_vm->playMovieBlocking("cl1wggat", kMystStack, 195, 225);
 		_state.gearsOpen = 1;
-		_vm->redrawArea(40);
+		_vm->getCard()->redrawArea(40);
 
 		_vm->_sound->playBackground(4113, 16384);
 	}
@@ -3085,7 +3099,7 @@ void Myst::clockReset() {
 
 		// Redraw gear
 		_state.gearsOpen = 0;
-		_vm->redrawArea(40);
+		_vm->getCard()->redrawArea(40);
 	}
 
 	_vm->_cursor->showCursor();
@@ -3131,7 +3145,7 @@ void Myst::o_clockResetLeverEndMove(uint16 var, const ArgumentsArray &args) {
 
 	lever->releaseLeverV();
 
-	_vm->checkCursorHints();
+	_vm->refreshCursor();
 }
 
 void Myst::o_libraryBook_init(uint16 var, const ArgumentsArray &args) {
@@ -3157,7 +3171,7 @@ void Myst::towerRotationMap_run() {
 		_vm->_gfx->copyBackBufferToScreen(Common::Rect(106, 42, 459, 273));
 	}
 
-	uint32 time = _vm->_system->getMillis();
+	uint32 time = _vm->getTotalPlayTime();
 	if (time > _startTime) {
 		if (_towerRotationMapClicked) {
 			towerRotationMapRotate();
@@ -3189,7 +3203,7 @@ void Myst::towerRotationMap_run() {
 void Myst::o_towerRotationMap_init(uint16 var, const ArgumentsArray &args) {
 	_towerRotationMapRunning = true;
 	_towerRotationMapTower = getInvokingResource<MystAreaImageSwitch>();
-	_towerRotationMapLabel = _vm->getViewResource<MystAreaImageSwitch>(args[0]);
+	_towerRotationMapLabel = _vm->getCard()->getResource<MystAreaImageSwitch>(args[0]);
 	_tempVar = 0;
 	_startTime = 0;
 	_towerRotationMapClicked = false;
@@ -3197,11 +3211,11 @@ void Myst::o_towerRotationMap_init(uint16 var, const ArgumentsArray &args) {
 
 void Myst::towerRotationDrawBuildings() {
 	// Draw library
-	_vm->redrawArea(304, false);
+	_vm->getCard()->redrawArea(304, false);
 
 	// Draw other resources
 	for (uint i = 1; i <= 10; i++) {
-		MystAreaImageSwitch *resource = _vm->getViewResource<MystAreaImageSwitch>(i);
+		MystAreaImageSwitch *resource = _vm->getCard()->getResource<MystAreaImageSwitch>(i);
 		_vm->redrawResource(resource, false);
 	}
 }
@@ -3246,9 +3260,9 @@ Common::Point Myst::towerRotationMapComputeCoords(uint16 angle) {
 	Common::Point end;
 
 	// Polar to rect coords
-	double radians = angle * M_PI / 180.0;
-	end.x = (int16)(_towerRotationCenter.x + cos(radians) * 310.0);
-	end.y = (int16)(_towerRotationCenter.y + sin(radians) * 310.0);
+	float radians = Common::deg2rad<uint16,float>(angle);
+	end.x = (int16)(_towerRotationCenter.x + cos(radians) * 310.0f);
+	end.y = (int16)(_towerRotationCenter.y + sin(radians) * 310.0f);
 
 	return end;
 }
@@ -3279,7 +3293,7 @@ void Myst::towerRotationMapDrawLine(const Common::Point &end, bool rotationLabel
 	src.bottom = 332 - rect.top;
 
 	// Redraw background
-	_vm->_gfx->copyImageSectionToBackBuffer(_vm->getCardBackgroundId(), src, rect);
+	_vm->_gfx->copyImageSectionToBackBuffer(_vm->getCard()->getBackgroundImageId(), src, rect);
 
 	// Draw buildings
 	towerRotationDrawBuildings();
@@ -3392,9 +3406,9 @@ void Myst::generatorControlRoom_run(void) {
 			_generatorVoltage++;
 
 		// Redraw generator gauge
-		_vm->redrawArea(62);
-		_vm->redrawArea(63);
-		_vm->redrawArea(96);
+		_vm->getCard()->redrawArea(62);
+		_vm->getCard()->redrawArea(63);
+		_vm->getCard()->redrawArea(96);
 	}
 }
 
@@ -3427,14 +3441,14 @@ void Myst::o_clockGears_init(uint16 var, const ArgumentsArray &args) {
 
 void Myst::o_gulls1_init(uint16 var, const ArgumentsArray &args) {
 	if (!_state.shipFloating) {
-		_gullsNextTime = _vm->_system->getMillis() + 2000;
+		_gullsNextTime = _vm->getTotalPlayTime() + 2000;
 		_gullsFlying1 = true;
 	}
 }
 
 void Myst::gullsFly1_run() {
 	static const char* gulls[] = { "birds1", "birds2", "birds3" };
-	uint32 time = _vm->_system->getMillis();
+	uint32 time = _vm->getTotalPlayTime();
 
 	if (time > _gullsNextTime) {
 		uint16 video = _vm->_rnd->getRandomNumber(3);
@@ -3457,16 +3471,16 @@ void Myst::o_observatory_init(uint16 var, const ArgumentsArray &args) {
 	_tempVar = 0;
 	_observatoryNotInitialized = true;
 	_observatoryVisualizer = getInvokingResource<MystAreaImageSwitch>();
-	_observatoryGoButton = _vm->getViewResource<MystAreaImageSwitch>(args[0]);
+	_observatoryGoButton = _vm->getCard()->getResource<MystAreaImageSwitch>(args[0]);
 	if (observatoryIsDDMMYYYY2400()) {
-		_observatoryDaySlider = _vm->getViewResource<MystAreaSlider>(args[1]);
-		_observatoryMonthSlider = _vm->getViewResource<MystAreaSlider>(args[2]);
+		_observatoryDaySlider = _vm->getCard()->getResource<MystAreaSlider>(args[1]);
+		_observatoryMonthSlider = _vm->getCard()->getResource<MystAreaSlider>(args[2]);
 	} else {
-		_observatoryMonthSlider = _vm->getViewResource<MystAreaSlider>(args[1]);
-		_observatoryDaySlider = _vm->getViewResource<MystAreaSlider>(args[2]);
+		_observatoryMonthSlider = _vm->getCard()->getResource<MystAreaSlider>(args[1]);
+		_observatoryDaySlider = _vm->getCard()->getResource<MystAreaSlider>(args[2]);
 	}
-	_observatoryYearSlider = _vm->getViewResource<MystAreaSlider>(args[3]);
-	_observatoryTimeSlider = _vm->getViewResource<MystAreaSlider>(args[4]);
+	_observatoryYearSlider = _vm->getCard()->getResource<MystAreaSlider>(args[3]);
+	_observatoryTimeSlider = _vm->getCard()->getResource<MystAreaSlider>(args[4]);
 
 	// Set date selection sliders position
 	_observatoryDaySlider->setPosition(_state.observatoryDaySlider);
@@ -3474,7 +3488,7 @@ void Myst::o_observatory_init(uint16 var, const ArgumentsArray &args) {
 	_observatoryYearSlider->setPosition(_state.observatoryYearSlider);
 	_observatoryTimeSlider->setPosition(_state.observatoryTimeSlider);
 
-	_observatoryLastTime = _vm->_system->getMillis();
+	_observatoryLastTime = _vm->getTotalPlayTime();
 
 	observatorySetTargetToSetting();
 
@@ -3561,7 +3575,7 @@ void Myst::observatory_run() {
 			|| _state.observatoryTimeTarget != _state.observatoryTimeSetting) {
 
 		// Blink the go button
-		uint32 time = _vm->_system->getMillis();
+		uint32 time = _vm->getTotalPlayTime();
 		if (time > _observatoryLastTime + 250) {
 			_tempVar = (_tempVar + 1) % 2;
 			_observatoryGoButton->drawConditionalDataToScreen(_tempVar);
@@ -3572,14 +3586,14 @@ void Myst::observatory_run() {
 
 void Myst::o_gulls2_init(uint16 var, const ArgumentsArray &args) {
 	if (!_state.shipFloating) {
-		_gullsNextTime = _vm->_system->getMillis() + 2000;
+		_gullsNextTime = _vm->getTotalPlayTime() + 2000;
 		_gullsFlying2 = true;
 	}
 }
 
 void Myst::gullsFly2_run() {
 	static const char* gulls[] = { "birds1", "birds2", "birds3" };
-	uint32 time = _vm->_system->getMillis();
+	uint32 time = _vm->getTotalPlayTime();
 
 	if (time > _gullsNextTime) {
 		uint16 video = _vm->_rnd->getRandomNumber(3);
@@ -3610,13 +3624,13 @@ void Myst::o_boilerMovies_init(uint16 var, const ArgumentsArray &args) {
 }
 
 void Myst::boilerFireInit() {
-	if (_vm->getCurCard() == 4098) {
+	if (_vm->getCard()->getId() == 4098) {
 		_cabinFireMovie = _vm->playMovie("cabfire", kMystStack);
 		_cabinFireMovie->moveTo(240, 279);
 		_cabinFireMovie->setLooping(true);
 		_cabinFireMovie->pause(true);
 
-		_vm->redrawArea(305);
+		_vm->getCard()->redrawArea(305);
 		boilerFireUpdate(true);
 	} else {
 		if (_state.cabinPilotLightLit == 1 && _state.cabinValvePosition >= 1) {
@@ -3646,7 +3660,7 @@ void Myst::boilerFireUpdate(bool init) {
 }
 
 void Myst::boilerGaugeInit() {
-	if (_vm->getCurCard() == 4098) {
+	if (_vm->getCard()->getId() == 4098) {
 		_cabinGaugeMovie = _vm->playMovie("cabingau", kMystStack);
 		_cabinGaugeMovie->moveTo(243, 96);
 	} else {
@@ -3668,11 +3682,11 @@ void Myst::boilerGaugeInit() {
 
 void Myst::o_rocketSliders_init(uint16 var, const ArgumentsArray &args) {
 	_rocketLinkBook.reset();
-	_rocketSlider1 = _vm->getViewResource<MystAreaSlider>(args[0]);
-	_rocketSlider2 = _vm->getViewResource<MystAreaSlider>(args[1]);
-	_rocketSlider3 = _vm->getViewResource<MystAreaSlider>(args[2]);
-	_rocketSlider4 = _vm->getViewResource<MystAreaSlider>(args[3]);
-	_rocketSlider5 = _vm->getViewResource<MystAreaSlider>(args[4]);
+	_rocketSlider1 = _vm->getCard()->getResource<MystAreaSlider>(args[0]);
+	_rocketSlider2 = _vm->getCard()->getResource<MystAreaSlider>(args[1]);
+	_rocketSlider3 = _vm->getCard()->getResource<MystAreaSlider>(args[2]);
+	_rocketSlider4 = _vm->getCard()->getResource<MystAreaSlider>(args[3]);
+	_rocketSlider5 = _vm->getCard()->getResource<MystAreaSlider>(args[4]);
 
 	// Initialize sliders position
 	for (uint i = 0; i < 5; i++)
@@ -3737,14 +3751,14 @@ void Myst::greenBook_run() {
 
 void Myst::o_gulls3_init(uint16 var, const ArgumentsArray &args) {
 	if (!_state.shipFloating) {
-		_gullsNextTime = _vm->_system->getMillis() + 2000;
+		_gullsNextTime = _vm->getTotalPlayTime() + 2000;
 		_gullsFlying3 = true;
 	}
 }
 
 void Myst::gullsFly3_run() {
 	static const char* gulls[] = { "birds1", "birds2", "birds3" };
-	uint32 time = _vm->_system->getMillis();
+	uint32 time = _vm->getTotalPlayTime();
 
 	if (time > _gullsNextTime) {
 		uint16 video = _vm->_rnd->getRandomNumber(3);

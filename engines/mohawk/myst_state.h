@@ -47,6 +47,8 @@ struct MystSaveMetadata {
 
 	uint32 totalPlayTime;
 
+	bool autoSave;
+
 	Common::String saveDescription;
 
 	MystSaveMetadata();
@@ -98,18 +100,22 @@ enum DniEnding {
 
 class MystGameState {
 public:
+	static const int kAutoSaveSlot;
+
 	MystGameState(MohawkEngine_Myst*, Common::SaveFileManager*);
 	~MystGameState();
 
 	static SaveStateDescriptor querySaveMetaInfos(int slot);
 	static Common::String querySaveDescription(int slot);
 
+	void reset();
 	bool load(int slot);
-	bool save(int slot, const Common::String &desc);
+	bool save(int slot, const Common::String &desc, const Graphics::Surface *thumbnail, bool autosave);
+	bool isAutoSaveAllowed();
 	static void deleteSave(int slot);
 
-	void addZipDest(uint16 stack, uint16 view);
-	bool isReachableZipDest(uint16 stack, uint16 view);
+	void addZipDest(MystStack stack, uint16 view);
+	bool isReachableZipDest(MystStack stack, uint16 view);
 
 	/* 8 Game Global Variables :
 	   0 = Unknown - Fixed at 2
@@ -340,8 +346,8 @@ private:
 	bool loadState(int slot);
 	void loadMetadata(int slot);
 	bool saveState(int slot);
-	void updateMetadateForSaving(const Common::String &desc);
-	bool saveMetadata(int slot);
+	void updateMetadateForSaving(const Common::String &desc, bool autoSave);
+	bool saveMetadata(int slot, const Graphics::Surface *thumbnail);
 
 	// The values in these regions are lists of VIEW resources
 	// which correspond to visited zip destinations

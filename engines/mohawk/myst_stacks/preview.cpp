@@ -35,7 +35,7 @@ namespace Mohawk {
 namespace MystStacks {
 
 Preview::Preview(MohawkEngine_Myst *vm) :
-		Myst(vm) {
+		Myst(vm, kDemoPreviewStack) {
 	setupOpcodes();
 	_vm->_cursor->hideCursor();
 
@@ -114,7 +114,7 @@ void Preview::speechUpdateCue() {
 }
 
 void Preview::speech_run() {
-	uint32 time = _vm->_system->getMillis();
+	uint32 time = _vm->getTotalPlayTime();
 
 	// Update current speech sound cue
 	speechUpdateCue();

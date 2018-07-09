@@ -32,7 +32,7 @@
 
 static const PlainGameDescriptor tuckerGames[] = {
 	{ "tucker", "Bud Tucker in Double Trouble" },
-	{ 0, 0 }
+	{ nullptr,  nullptr }
 };
 
 static const ADGameDescription tuckerGameDescriptions[] = {
@@ -146,21 +146,22 @@ public:
 		if (desc) {
 			*engine = new Tucker::TuckerEngine(syst, desc->language, desc->flags);
 		}
-		return desc != 0;
+		return desc != nullptr;
 	}
 
-	virtual const ADGameDescription *fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const {
+	virtual ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const override {
 		for (Common::FSList::const_iterator d = fslist.begin(); d != fslist.end(); ++d) {
 			Common::FSList audiofslist;
 			if (d->isDirectory() && d->getName().equalsIgnoreCase("audio") && d->getChildren(audiofslist, Common::FSNode::kListFilesOnly)) {
 				for (Common::FSList::const_iterator f = audiofslist.begin(); f != audiofslist.end(); ++f) {
 					if (!f->isDirectory() && f->getName().equalsIgnoreCase("demorolc.raw")) {
-						return &tuckerDemoGameDescription;
+						return ADDetectedGame(&tuckerDemoGameDescription);
 					}
 				}
 			}
 		}
-		return 0;
+
+		return ADDetectedGame();
 	}
 
 	virtual SaveStateList listSaves(const char *target) const {

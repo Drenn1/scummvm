@@ -927,19 +927,17 @@ is simpler and more straightforward than moving around using the menu.
 
 3.15 Might and Magic Xeen games notes:
 --------------------------------------
-To properly plan the World of Xeen CD Talkie using original discs,
-use LAME or some other MP3 encoder to rip the cd audio tracks to files.
-Name the files track1.mp3 track2.mp3 etc. ScummVM must be compiled with
-MAD support to use this option. You will need to rip the file from the
-CD as a WAV file, then encode the MP3 files in constant bit rate. This
-can be done with the following LAME command line:
-
-  lame -t -q 0 -b 96 track1.wav track1.mp3
+To properly play the World of Xeen CD Talkie using original discs,
+use LAME or some other encoder to rip the cd audio tracks to files,
+either mp3 or ogg. Whichever you choose, the tracks of the first CD
+should be named from track02 to track31, whereas the second CD's
+audio tracks should be encoded and renamed as track32 through to track60.
 
 For the GOG Might and Magic 4-5 installation, install the game to your
 computer, and do the following steps:
-* The game1.gog file from the game folder is a CD ISO. Use software like
-Virtual CloneDrive to mount it as a drive.
+* The game1.inst (CUE) and game1.gog (BIN) file from the game folder is a 
+CD image. Use software like Virtual CloneDrive to mount it as a drive.
+Linux and MacOS users can use bchunk to convert it to an ISO.
 * Copy all the .cc files from the subfolder in the mounted drive to a new
 empty game folder that you create for the game.
 * Copy all the music/*.ogg files from the GOG installation to your game
@@ -965,6 +963,9 @@ Left Click: Move/action
 Space: Pause the game
 Esc: Skip cutscene
 F5: Menu
+
+Myst will autosave to slot 0 if no save or an autosave is present in
+slot 0.
 
 
 3.17) Nippon Safes Inc. Amiga notes:
@@ -1011,6 +1012,9 @@ Esc: Skip cutscene
 F5: Menu
 Ctrl-o: Load game
 Ctrl-s: Save game
+
+Riven will autosave to slot 0 if no save or an autosave is present in
+slot 0.
 
 
 3.20) Simon the Sorcerer games notes:
@@ -1523,6 +1527,7 @@ arguments -- see the next section.
   -f, --fullscreen         Force full-screen mode
   -F, --no-fullscreen      Force windowed mode
   -g, --gfx-mode=MODE      Select graphics scaler (see also section 5.3)
+  --stretch-mode=MODE      Select stretch mode (center, integral, fit, stretch)
   --filtering              Force filtered graphics mode
   --no-filtering           Force unfiltered graphics mode
 
@@ -1714,6 +1719,7 @@ other games.
                              stretches the image to use 320x240 pixels
                              instead, or a multiple thereof
     Ctrl-Alt f             - Enable/disable graphics filtering
+    Ctrl-Alt s             - Cycle through scaling modes
     Alt-Enter              - Toggles full screen/windowed
     Alt-s                  - Make a screenshot (SDL backend only)
     Ctrl-F7                - Open virtual keyboard (if enabled)
@@ -1987,11 +1993,24 @@ saved games from the old default location, to the new default location.
 
 6.1) Autosaves:
 ---- ----------
-For some games (namely "Beneath a Steel Sky", "Flight of the Amazon
-Queen", all AGI games, and all SCUMM games), ScummVM will by default
-automatically save the current state every five minutes (adjustable via
-the "autosave_period" config setting). For the AGI and SCUMM engines, it
-will save in Slot 0. For the SCUMM engine, this saved game can then be
+For some games ScummVM will by default automatically save the current state
+every five minutes (adjustable via the "autosave_period" config setting).
+The default autosave slot for many engines is slot 0.
+
+The games/engines listed below have autosave support.
+
+AGI games
+Beneath a Steel Sky
+Bud Tucker in Double Trouble
+COMPOSER games
+Flight of the Amazon Queen
+Myst
+Riven
+SCUMM games
+The Legend of Kyrandia I (slot 999)
+ZVISION games
+
+For the SCUMM engine, this saved game can then be
 loaded again via Ctrl-0, or the F5 menu.
 
 

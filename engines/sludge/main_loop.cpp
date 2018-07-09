@@ -28,8 +28,10 @@
 #include "sludge/backdrop.h"
 #include "sludge/event.h"
 #include "sludge/floor.h"
+#include "sludge/function.h"
 #include "sludge/graphics.h"
 #include "sludge/language.h"
+#include "sludge/loadsave.h"
 #include "sludge/newfatal.h"
 #include "sludge/objtypes.h"
 #include "sludge/people.h"
@@ -62,7 +64,8 @@ int main_loop(Common::String filename) {
 		g_sludge->_evtMan->checkInput();
 		g_sludge->_peopleMan->walkAllPeople();
 		if (g_sludge->_evtMan->handleInput()) {
-			runSludge();
+			runAllFunctions();
+			handleSaveLoad();
 		}
 		sludgeDisplay();
 		g_sludge->_soundMan->handleSoundLists();

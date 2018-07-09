@@ -22,6 +22,7 @@
 
 #include "mohawk/myst.h"
 #include "mohawk/myst_areas.h"
+#include "mohawk/myst_card.h"
 #include "mohawk/myst_graphics.h"
 #include "mohawk/cursors.h"
 #include "mohawk/sound.h"
@@ -36,7 +37,7 @@ namespace MystStacks {
 // NOTE: Credits Start Card is 10000
 
 Credits::Credits(MohawkEngine_Myst *vm) :
-		MystScriptParser(vm),
+		MystScriptParser(vm, kCreditsStack),
 		_creditsRunning(false),
 		_curImage(0) {
 	setupOpcodes();
@@ -61,7 +62,7 @@ void Credits::runPersistentScripts() {
 	if (!_creditsRunning)
 		return;
 
-	if (_vm->_system->getMillis() - _startTime >= 7 * 1000) {
+	if (_vm->getTotalPlayTime() - _startTime >= 7 * 1000) {
 		_curImage++;
 
 		// After the 6th image has shown, it's time to quit
@@ -71,10 +72,10 @@ void Credits::runPersistentScripts() {
 		}
 
 		// Draw next image
-		_vm->drawCardBackground();
+		_vm->getCard()->drawBackground();
 		_vm->_gfx->copyBackBufferToScreen(Common::Rect(544, 333));
 
-		_startTime = _vm->_system->getMillis();
+		_startTime = _vm->getTotalPlayTime();
 	}
 }
 
@@ -97,7 +98,7 @@ void Credits::o_runCredits(uint16 var, const ArgumentsArray &args) {
 	// Activate the credits
 	_creditsRunning = true;
 	_curImage = 0;
-	_startTime = _vm->_system->getMillis();
+	_startTime = _vm->getTotalPlayTime();
 }
 
 } // End of namespace MystStacks

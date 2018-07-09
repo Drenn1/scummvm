@@ -167,6 +167,7 @@ _build_hq_scalers=yes
 _enable_prof=no
 _global_constructors=no
 _no_undefined_var_template=no
+_no_pragma_pack=no
 _bink=yes
 _cloud=auto
 # Default vkeybd/keymapper/eventrec options
@@ -221,6 +222,7 @@ _have_x86=no
 
 # Add (virtual) features
 add_feature 16bit "16bit color" "_16bit"
+add_feature bink "Bink" "_bink"
 add_feature cloud "cloud" "_cloud"
 add_feature faad "libfaad" "_faad"
 add_feature flac "FLAC" "_flac"
@@ -1800,6 +1802,12 @@ riscos)
 		echo "Please set GCCSDK_INSTALL_ENV in your environment. export GCCSDK_INSTALL_ENV=<path to GCCSDK_INSTALL_ENV>"
 		exit 1
 	fi
+
+	if test -e "$GCCSDK_INSTALL_ENV/bin/tokenize"; then
+		add_line_to_config_mk "TOKENIZE := $GCCSDK_INSTALL_ENV/bin/tokenize"
+	elif `which tokenize >/dev/null 2>&1`; then
+		add_line_to_config_mk "TOKENIZE := tokenize"
+	fi
 	;;
 tizen)
 	if test -z "$TIZEN_ROOTSTRAP"; then
@@ -2065,7 +2073,7 @@ esac
 
 # If possible, we want to use -Wglobal-constructors
 # However, not all compilers support that, so check whether the active one does.
-echocheck "whether -Wglobal-constructors work"
+echocheck "whether C++ compiler accepts -Wglobal-constructors"
 cat > $TMPC << EOF
 int main() { return 0; }
 EOF
@@ -2082,7 +2090,7 @@ echo $_global_constructors
 # change the way we instantiate the singleton classes as done in PR #967.
 # Note: we check the -Wundefined-var-template as gcc does not error out on unknown
 # -Wno-xxx flags.
-echocheck "whether -Wno-undefined-var-template work"
+echocheck "whether C++ compiler accepts -Wno-undefined-var-template"
 cat > $TMPC << EOF
 int main() { return 0; }
 EOF
@@ -2093,13 +2101,27 @@ if test "$_no_undefined_var_template" = yes; then
 fi
 echo $_no_undefined_var_template
 
+# Vanilla clang 6 enables the new -Wpragma-pack which warns when leaving an
+# included file which changes the current alignment.
+# As our common/pack-{start,end}.h trigger this we disable this warning.
+# Because there is no correlation between the version reported by Apple Xcode
+# clang and vanilla clang we cannot rely on the __clang_major__/clang_minor__
+# macros.
+# Note: as above, we check for -Wpragma-pack as not all compilers error out on
+# unknown -Wno-xxx flags.
+echocheck "whether C++ compiler accepts -Wno-pragma-pack"
+echo "int main() { return 0; }" >$TMPC
+cc_check -Wpragma-pack -Werror && _no_pragma_pack=yes
+test "$_no_pragma_pack" = yes && append_var CXXFLAGS "-Wno-pragma-pack"
+echo $_no_pragma_pack
+
 echo_n "Checking for $_host_alias-strings... " >> "$TMPLOG"
 if `which $_host_alias-strings >/dev/null 2>&1`; then
-_strings=$_host_alias-strings
-echo yes >> "$TMPLOG"
+	_strings=$_host_alias-strings
+	echo yes >> "$TMPLOG"
 else
-_strings=strings
-echo no >> "$TMPLOG"
+	_strings=strings
+	echo no >> "$TMPLOG"
 fi
 
 #

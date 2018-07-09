@@ -31,6 +31,8 @@
 #include "common/random.h"
 #include "common/rect.h"
 
+#include "graphics/surface.h"
+
 namespace Mohawk {
 
 struct MohawkGameDescription;
@@ -109,6 +111,8 @@ private:
 	// Datafiles
 	MohawkArchive *_extrasFile; // We need a separate handle for the extra data
 	const char **listExpectedDatafiles() const;
+	Common::String getDatafileLanguageName() const;
+	Common::String getLanguageDatafile(char prefix) const;
 	bool checkDatafiles();
 
 	RivenConsole *_console;
@@ -120,7 +124,12 @@ private:
 	RivenCard *_card;
 	RivenStack *_stack;
 
+	int _menuSavedCard;
+	int _menuSavedStack;
+	Common::ScopedPtr<Graphics::Surface, Graphics::SurfaceDeleter> _menuTumbnail;
+
 	bool _gameEnded;
+	uint32 _lastSaveTime;
 
 	// Variables
 	void initVars();
@@ -148,11 +157,14 @@ public:
 	bool _activatedPLST;
 	bool _activatedSLST;
 	void delay(uint32 ms);
+	void runOptionsDialog();
 
 	// Save / Load
 	void runLoadDialog();
 	void runSaveDialog();
+	void tryAutoSaving();
 	void loadGameStateAndDisplayError(int slot);
+	Common::Error saveGameState(int slot, const Common::String &desc, bool autosave);
 	void saveGameStateAndDisplayError(int slot, const Common::String &desc);
 
 	/**
@@ -164,6 +176,12 @@ public:
 	 * End the game gracefully
 	 */
 	void setGameEnded();
+
+	// Main menu handling
+	void goToMainMenu();
+	void resumeFromMainMenu();
+	bool isGameStarted() const;
+	void startNewGame();
 };
 
 } // End of namespace Mohawk

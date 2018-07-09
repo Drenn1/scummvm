@@ -19,19 +19,23 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  */
+#ifndef PINK_WALK_LOCATION_H
+#define PINK_WALK_LOCATION_H
 
-#include "gui/dialog.h"
+#include "pink/utils.h"
 
-class UnknownGameDialog : public GUI::Dialog {
+namespace Pink {
+
+class WalkLocation : public NamedObject {
 public:
-	UnknownGameDialog(const Common::String &reportData, const Common::String &reportTranslated, const Common::String &bugtrackerAffectedEngine);
-	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data);
-	virtual Common::String generateBugtrackerURL();
-	virtual void reflowLayout();
+	virtual void deserialize(Archive &archive);
+	void toConsole() override;
+	Common::StringArray &getNeigbors() { return _neighbors;}
 
 private:
-	Common::String _reportData;
-	Common::String _reportTranslated;
-	Common::String _bugtrackerGameData;
-	Common::String _bugtrackerAffectedEngine;
+	StringArray _neighbors;
 };
+
+} // End of namespace Pink
+
+#endif

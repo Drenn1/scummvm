@@ -163,6 +163,7 @@ Interface::Interface(XeenEngine *vm) : ButtonContainer(vm), InterfaceScene(vm),
 	_upDoorText = false;
 	_tillMove = 0;
 	Common::fill(&_charFX[0], &_charFX[MAX_ACTIVE_PARTY], 0);
+	setWaitBounds();
 }
 
 void Interface::setup() {
@@ -209,7 +210,7 @@ void Interface::mainIconsPrint() {
 	Windows &windows = *_vm->_windows;
 	windows[38].close();
 	windows[12].close();
-	
+
 	res._globalSprites.draw(0, 7, Common::Point(232, 74));
 	drawButtons(&windows[0]);
 	windows[34].update();
@@ -1376,7 +1377,7 @@ void Interface::assembleBorder() {
 
 	_face2UIFrame = (_face2UIFrame + 1) % 4 + 12;
 	if (_face2State == 0)
-		_face2UIFrame - 3;
+		_face2UIFrame -= 3;
 	else if (_face2State == 2)
 		_face2UIFrame = 8;
 
@@ -1441,8 +1442,7 @@ void Interface::assembleBorder() {
 	// Draw direction character if direction sense is active
 	if (_vm->_party->checkSkill(DIRECTION_SENSE) && !_vm->_noDirectionSense) {
 		const char *dirText = Res.DIRECTION_TEXT_UPPER[_vm->_party->_mazeDirection];
-		Common::String msg = Common::String::format(
-			"\002""08\003""c\013""139\011""116%c\014""d\001", *dirText);
+		Common::String msg = Common::String::format("\x2\f08\x3""c\v139\t116%c\fd\x1", *dirText);
 		windows[0].writeString(msg);
 	}
 
@@ -1510,7 +1510,7 @@ void Interface::doCombat() {
 			// FIXME: I've had a rare issue where the loop starts with a non-party _whosTurn. Unfortunately,
 			// I haven't been able to consistently replicate and diagnose the problem, so for now,
 			// I'm simply detecting if it happens and resetting the combat round
-			if (combat._whosTurn >= party._activeParty.size())
+			if (combat._whosTurn >= (int)party._activeParty.size())
 				goto new_round;
 
 			highlightChar(combat._whosTurn);

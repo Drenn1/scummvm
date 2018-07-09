@@ -21,6 +21,7 @@
  */
 
 #include "common/config-manager.h"
+#include "common/textconsole.h"
 #include "backends/audiocd/audiocd.h"
 #include "xeen/scripts.h"
 #include "xeen/dialogs/dialogs_copy_protection.h"
@@ -215,20 +216,23 @@ int Scripts::checkEvents() {
 		MazeObject &selectedObj = map._mobData._objects[intf._objNumber];
 
 		if (selectedObj._spriteId == (ccNum ? 15 : 16)) {
-			for (int idx = 0; idx < MIN((int)map._mobData._objects.size(), 16); ++idx) {
-				MazeObject &obj = map._mobData._objects[idx];
-				if (obj._spriteId == (ccNum ? 62 : 57)) {
+			// Treasure chests that were opened will be set to be in an open, empty state
+			for (uint idx = 0; idx < map._mobData._objectSprites.size(); ++idx) {
+				MonsterObjectData::SpriteResourceEntry &e = map._mobData._objectSprites[idx];
+				if (e._spriteId == (ccNum ? 57 : 62)) {
 					selectedObj._id = idx;
-					selectedObj._spriteId = ccNum ? 62 : 57;
+					selectedObj._spriteId = ccNum ? 57 : 62;
+					selectedObj._sprites = &e._sprites;
 					break;
 				}
 			}
 		} else if (selectedObj._spriteId == 73) {
-			for (int idx = 0; idx < MIN((int)map._mobData._objects.size(), 16); ++idx) {
-				MazeObject &obj = map._mobData._objects[idx];
-				if (obj._spriteId == 119) {
+			for (uint idx = 0; idx < map._mobData._objectSprites.size(); ++idx) {
+				MonsterObjectData::SpriteResourceEntry &e = map._mobData._objectSprites[idx];
+				if (e._spriteId == 119) {
 					selectedObj._id = idx;
 					selectedObj._spriteId = 119;
+					selectedObj._sprites = &e._sprites;
 					break;
 				}
 			}
@@ -238,6 +242,10 @@ int Scripts::checkEvents() {
 	_animCounter = 0;
 	_vm->_mode = oldMode;
 	windows.closeAll();
+
+	if (g_vm->getIsCD() && g_system->getAudioCDManager()->isPlaying())
+		// Stop any playing voice
+		g_system->getAudioCDManager()->stop();
 
 	if (g_vm->shouldExit())
 		return g_vm->_gameMode;
@@ -474,7 +482,7 @@ bool Scripts::cmdTeleport(ParamsIterator &params) {
 	Sound &sound = *_vm->_sound;
 
 	windows.closeAll();
-	
+
 	bool restartFlag = _event->_opcode == OP_TeleportAndContinue;
 	int mapId = params.readByte();
 	Common::Point pt;
@@ -1469,11 +1477,27 @@ bool Scripts::cmdFlipWorld(ParamsIterator &params) {
 
 bool Scripts::cmdPlayCD(ParamsIterator &params) {
 	int trackNum = params.readByte();
-	int start = params.readUint16LE() * 60 / 75;
-	int finish = params.readUint16LE() * 60 / 75;
+	int start = params.readUint16LE();
+	int finish = params.readUint16LE();
+	debugC(3, kDebugScripts, "cmdPlayCD Track=%d start=%d finish=%d", trackNum, start, finish);
 
-	g_system->getAudioCDManager()->play(trackNum, 1, start, finish - start);
+	if (_vm->_files->_ccNum && trackNum < 31)
+		trackNum += 30;
+	assert(trackNum <= 60);
+
+	start = convertCDTime(start);
+	finish = convertCDTime(finish);
+
+	g_system->getAudioCDManager()->play(trackNum, 1, start, finish - start, false, Audio::Mixer::kSpeechSoundType);
 	return true;
+}
+
+#define CD_FRAME_RATE 75
+uint Scripts::convertCDTime(uint srcTime) {
+	// Times are encoded as MMSSCC - MM=Minutes, SS=Seconds, CC=Centiseconds (1/100th second)
+	uint mins = srcTime / 10000;
+	uint csec = srcTime % 10000;
+	return (mins * 6000 + csec) * CD_FRAME_RATE / 100;
 }
 
 void Scripts::doCloudsEnding() {
@@ -1793,16 +1817,16 @@ bool Scripts::ifProc(int action, uint32 val, int mode, int charIndex) {
 		v = ps->_ACTemp;
 		break;
 	case 78:
-		// Test whether current Hp is equal to or exceeds the max HP
-		v = ps->_currentHp >= ps->getMaxHP() ? 1 : 0;
+		// Test whether current Hp exceeds max HP or not
+		v = ps->_currentHp <= ps->getMaxHP() ? 1 : 0;
 		break;
 	case 79:
 		// Test for Wizard Eye being active
 		v = party._wizardEyeActive ? 1 : 0;
 		break;
 	case 81:
-		// Test whether current Sp is equal to or exceeds the max SP
-		v = ps->_currentSp >= ps->getMaxSP() ? 1 : 0;
+		// Test whether current Sp exceeds the max SP or not
+		v = ps->_currentSp <= ps->getMaxSP() ? 1 : 0;
 		break;
 	case 84:
 		// Current facing direction

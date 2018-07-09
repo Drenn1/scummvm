@@ -74,6 +74,7 @@ bool DarkSideCutscenes::showDarkSideTitle(bool seenIntro) {
 	Screen &screen = *g_vm->_screen;
 	Sound &sound = *g_vm->_sound;
 	g_vm->_files->_ccNum = true;
+	_subtitles.reset();
 
 	screen.loadPalette("dark.pal");
 	SpriteResource nwc[4] = {
@@ -104,7 +105,7 @@ bool DarkSideCutscenes::showDarkSideTitle(bool seenIntro) {
 		// Render the next frame
 		screen.vertMerge(0);
 		nwc[nwcIndex].draw(0, nwcFrame);
-	
+
 		switch (idx) {
 		case 17:
 			sound.playSound(voc[0]);
@@ -128,7 +129,7 @@ bool DarkSideCutscenes::showDarkSideTitle(bool seenIntro) {
 	for (int idx = 0; idx < 42 && !g_vm->shouldExit(); ++idx) {
 		screen.vertMerge(SCREEN_HEIGHT);
 		nwc[3].draw(0, idx);
-	
+
 		switch (idx) {
 		case 3:
 			sound.playFX(40);
@@ -169,6 +170,7 @@ bool DarkSideCutscenes::showDarkSideIntro(bool seenIntro) {
 
 	files._ccNum = true;
 	files.setGameCc(1);
+	_subtitles.reset();
 
 	if (showDarkSideTitle(seenIntro)) {
 		if (seenIntro) {
@@ -808,7 +810,7 @@ bool DarkSideCutscenes::showWorldOfXeenLogo() {
 		for (int idx = 0; idx < 21; ++idx) {
 			screen.restoreBackground();
 			wfire[6].draw(0, idx, Common::Point(0, 45));
-			
+
 			switch (idx) {
 			case 0:
 			case 11:
@@ -836,6 +838,7 @@ void DarkSideCutscenes::showDarkSideEnding(uint endingScore) {
 	Sound &sound = *g_vm->_sound;
 
 	files.setGameCc(1);
+	_subtitles.reset();
 	sound._musicSide = 1;
 	screen.fadeOut();
 

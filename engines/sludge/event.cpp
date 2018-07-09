@@ -25,6 +25,7 @@
 
 #include "sludge/event.h"
 #include "sludge/freeze.h"
+#include "sludge/function.h"
 #include "sludge/graphics.h"
 #include "sludge/newfatal.h"
 #include "sludge/region.h"
@@ -156,7 +157,7 @@ bool EventManager::handleInput() {
 		} else {
 			l = 1;
 
-			setVariable(*launchResult, SVT_INT, 0/*launch(launchMe) > 31*/); //TODO:false value
+			launchResult->setVariable(SVT_INT, 0/*launch(launchMe) > 31*/); //TODO:false value
 			_vm->launchMe.clear();
 			launchResult = nullptr;
 		}
@@ -181,12 +182,11 @@ bool EventManager::handleInput() {
 		if (!checkNew(tempStack))
 			return false;
 
-		initVarNew(tempStack->thisVar);
 		ScreenRegion *overRegion = _vm->_regionMan->getOverRegion();
 		if (overRegion) {
-			setVariable(tempStack->thisVar, SVT_OBJTYPE, overRegion->thisType->objectNum);
+			tempStack->thisVar.setVariable(SVT_OBJTYPE, overRegion->thisType->objectNum);
 		} else {
-			setVariable(tempStack->thisVar, SVT_INT, 0);
+			tempStack->thisVar.setVariable(SVT_INT, 0);
 		}
 		tempStack->next = nullptr;
 		if (!startNewFunctionNum(_currentEvents->func[kFocus], 1, nullptr, tempStack))
@@ -320,8 +320,7 @@ bool EventManager::handleInput() {
 			VariableStack *tempStack = new VariableStack;
 			if (!checkNew(tempStack))
 				return false;
-			initVarNew(tempStack->thisVar);
-			makeTextVar(tempStack->thisVar, tempString);
+			tempStack->thisVar.makeTextVar(tempString);
 			tempStack->next = nullptr;
 			if (!startNewFunctionNum(_currentEvents->func[kSpace], 1, nullptr, tempStack))
 				return false;

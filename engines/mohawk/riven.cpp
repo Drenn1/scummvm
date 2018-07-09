@@ -26,6 +26,7 @@
 #include "common/keyboard.h"
 #include "common/translation.h"
 #include "common/system.h"
+#include "graphics/scaler.h"
 #include "gui/saveload.h"
 #include "gui/message.h"
 
@@ -71,6 +72,10 @@ MohawkEngine_Riven::MohawkEngine_Riven(OSystem *syst, const MohawkGameDescriptio
 	_optionsDialog = nullptr;
 	_card = nullptr;
 	_inventory = nullptr;
+	_lastSaveTime = 0;
+
+	_menuSavedCard = -1;
+	_menuSavedStack = -1;
 
 	DebugMan.addDebugChannel(kRivenDebugScript, "Script", "Track Script Execution");
 	DebugMan.addDebugChannel(kRivenDebugPatches, "Patches", "Track Script Patching");
@@ -112,6 +117,10 @@ GUI::Debugger *MohawkEngine_Riven::getDebugger() {
 
 Common::Error MohawkEngine_Riven::run() {
 	MohawkEngine::run();
+
+	if (!_mixer->isReady()) {
+		return Common::kAudioDeviceInitFailed;
+	}
 
 	// Let's try to open the installer file (it holds extras.mhk)
 	// Though, we set a low priority to prefer the extracted version
@@ -235,13 +244,7 @@ void MohawkEngine_Riven::doFrame() {
 				pauseGame();
 				break;
 			case Common::KEYCODE_F5:
-				runDialog(*_optionsDialog);
-				if (_optionsDialog->getLoadSlot() >= 0)
-					loadGameStateAndDisplayError(_optionsDialog->getLoadSlot());
-				if (_optionsDialog->getSaveSlot() >= 0)
-					saveGameStateAndDisplayError(_optionsDialog->getSaveSlot(), _optionsDialog->getSaveDescription());
-				_gfx->setTransitionMode((RivenTransitionMode) _vars["transitionmode"]);
-				_card->initializeZipMode();
+				runOptionsDialog();
 				break;
 			case Common::KEYCODE_r:
 				// Return to the main menu in the demo on ctrl+r
@@ -273,6 +276,18 @@ void MohawkEngine_Riven::doFrame() {
 					}
 				}
 				break;
+			case Common::KEYCODE_ESCAPE:
+				if (!_scriptMan->hasQueuedScripts() && getFeatures() & GF_25TH) {
+					// Check if we haven't jumped to menu
+					if (_menuSavedStack == -1) {
+						goToMainMenu();
+					} else {
+						resumeFromMainMenu();
+					}
+				} else {
+					_stack->onKeyPressed(event.kbd);
+				}
+				break;
 			default:
 				if (event.kbdRepeat) {
 					continue;
@@ -280,6 +295,11 @@ void MohawkEngine_Riven::doFrame() {
 				_stack->onKeyPressed(event.kbd);
 				break;
 			}
+			break;
+		case Common::EVENT_QUIT:
+		case Common::EVENT_RTL:
+			// Attempt to autosave before exiting
+			tryAutoSaving();
 			break;
 		default:
 			break;
@@ -294,6 +314,10 @@ void MohawkEngine_Riven::doFrame() {
 		_scriptMan->runQueuedScripts();
 	}
 
+	if (shouldPerformAutoSave(_lastSaveTime)) {
+		tryAutoSaving();
+	}
+
 	_inventory->onFrame();
 
 	// Update the screen once per frame
@@ -301,6 +325,38 @@ void MohawkEngine_Riven::doFrame() {
 
 	// Cut down on CPU usage
 	_system->delayMillis(10);
+}
+
+void MohawkEngine_Riven::goToMainMenu() {
+	_menuSavedStack = _stack->getId();
+	_menuSavedCard = _card->getId();
+
+	// If we are already in menu, do not call again
+	if (_menuSavedStack == kStackAspit && _menuSavedCard == 1) {
+		_menuSavedStack = -1;
+		_menuSavedCard = -1;
+		return;
+	}
+
+	_menuTumbnail.reset(new Graphics::Surface());
+	createThumbnailFromScreen(_menuTumbnail.get());
+
+	changeToStack(kStackAspit);
+	changeToCard(1);
+}
+
+void MohawkEngine_Riven::resumeFromMainMenu() {
+	assert(_menuSavedStack != -1);
+
+	changeToStack(_menuSavedStack);
+	changeToCard(_menuSavedCard);
+	_menuSavedStack = -1;
+	_menuSavedCard = -1;
+	_menuTumbnail.reset();
+}
+
+bool MohawkEngine_Riven::isGameStarted() const {
+	return _stack->getId() != kStackAspit || _menuSavedStack != -1;
 }
 
 void MohawkEngine_Riven::pauseEngineIntern(bool pause) {
@@ -339,6 +395,16 @@ void MohawkEngine_Riven::changeToStack(uint16 stackId) {
 
 	// Get the prefix character for the destination stack
 	char prefix = RivenStacks::getName(stackId)[0];
+
+	// Load the localization override file if any
+	Common::String languageDatafile = getLanguageDatafile(prefix);
+	if (!languageDatafile.empty()) {
+		MohawkArchive *mhk = new MohawkArchive();
+		if (mhk->openFile(languageDatafile))
+			_mhk.push_back(mhk);
+		else
+			delete mhk;
+	}
 
 	// Load files that start with the prefix
 	const char **datafiles = listExpectedDatafiles();
@@ -436,6 +502,18 @@ bool MohawkEngine_Riven::checkDatafiles() {
 	return false;
 }
 
+Common::String MohawkEngine_Riven::getLanguageDatafile(char prefix) const {
+	if (!(getFeatures() & GF_25TH) || getLanguage() == Common::EN_ANY)
+		return "";
+
+	Common::String language = getDatafileLanguageName();
+	if (language.empty()) {
+		return "";
+	}
+
+	return Common::String::format("%c_data_%s.mhk", prefix, language.c_str());
+}
+
 RivenStack *MohawkEngine_Riven::constructStackById(uint16 id) {
 	switch (id) {
 		case kStackAspit:
@@ -529,6 +607,20 @@ void MohawkEngine_Riven::delay(uint32 ms) {
 	}
 }
 
+void MohawkEngine_Riven::startNewGame() {
+	// Clear all the state data
+	_menuSavedStack = -1;
+	_menuSavedCard = -1;
+	_menuTumbnail.reset();
+
+	_vars.clear();
+	initVars();
+
+	_zipModeData.clear();
+
+	setTotalPlayTime(0);
+}
+
 void MohawkEngine_Riven::runLoadDialog() {
 	GUI::SaveLoadChooser slc(_("Load game:"), _("Load"), false);
 
@@ -560,7 +652,15 @@ void MohawkEngine_Riven::runSaveDialog() {
 }
 
 Common::Error MohawkEngine_Riven::loadGameState(int slot) {
-	return _saveLoad->loadGame(slot);
+	Common::Error loadError = _saveLoad->loadGame(slot);
+
+	if (loadError.getCode() == Common::kNoError) {
+		_menuSavedStack = -1;
+		_menuSavedCard = -1;
+		_menuTumbnail.reset();
+	}
+
+	return loadError;
 }
 
 void MohawkEngine_Riven::loadGameStateAndDisplayError(int slot) {
@@ -575,7 +675,24 @@ void MohawkEngine_Riven::loadGameStateAndDisplayError(int slot) {
 }
 
 Common::Error MohawkEngine_Riven::saveGameState(int slot, const Common::String &desc) {
-	return _saveLoad->saveGame(slot, desc);
+	return saveGameState(slot, desc, false);
+}
+
+Common::Error MohawkEngine_Riven::saveGameState(int slot, const Common::String &desc, bool autosave) {
+	if (_menuSavedStack != -1) {
+		_vars["CurrentStackID"] = _menuSavedStack;
+		_vars["CurrentCardID"] = _menuSavedCard;
+	}
+
+	const Graphics::Surface *thumbnail = _menuSavedStack != -1 ? _menuTumbnail.get() : nullptr;
+	Common::Error error = _saveLoad->saveGame(slot, desc, thumbnail, autosave);
+
+	if (_menuSavedStack != -1) {
+		_vars["CurrentStackID"] = 1;
+		_vars["CurrentCardID"] = 1;
+	}
+
+	return error;
 }
 
 void MohawkEngine_Riven::saveGameStateAndDisplayError(int slot, const Common::String &desc) {
@@ -588,6 +705,23 @@ void MohawkEngine_Riven::saveGameStateAndDisplayError(int slot, const Common::St
 		dialog.runModal();
 	}
 }
+
+void MohawkEngine_Riven::tryAutoSaving() {
+	if (!canSaveGameStateCurrently() || !isGameStarted()) {
+		return; // Can't save right now, try again on the next frame
+	}
+
+	_lastSaveTime = _system->getMillis();
+
+	if (!_saveLoad->isAutoSaveAllowed()) {
+		return; // Can't autosave ever, try again after the next autosave delay
+	}
+
+	Common::Error saveError = saveGameState(RivenSaveLoad::kAutoSaveSlot, "Autosave", true);
+	if (saveError.getCode() != Common::kNoError)
+		warning("Attempt to autosave has failed.");
+}
+
 
 void MohawkEngine_Riven::addZipVisitedCard(uint16 cardId, uint16 cardNameId) {
 	Common::String cardName = getStack()->getName(kCardNames, cardNameId);
@@ -635,6 +769,18 @@ bool MohawkEngine_Riven::hasGameEnded() const {
 
 void MohawkEngine_Riven::setGameEnded() {
 	_gameEnded = true;
+}
+
+void MohawkEngine_Riven::runOptionsDialog() {
+	runDialog(*_optionsDialog);
+
+	if (hasGameEnded()) {
+		// Attempt to autosave before exiting
+		tryAutoSaving();
+	}
+
+	_gfx->setTransitionMode((RivenTransitionMode) _vars["transitionmode"]);
+	_card->initializeZipMode();
 }
 
 bool ZipMode::operator== (const ZipMode &z) const {

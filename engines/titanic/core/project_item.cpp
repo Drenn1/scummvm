@@ -189,13 +189,14 @@ void CProjectItem::loadGame(int slotId) {
 
 	// Load the savegame header in
 	TitanicSavegameHeader header;
-	readSavegameHeader(&file, header);
+	if (!readSavegameHeader(&file, header))
+		error("Failed to read save game header");
 
 	g_vm->_events->setTotalPlayTicks(header._totalFrames);
 
 	// Load the contents in
 	CProjectItem *newProject = loadData(&file);
-	file.IsClassStart();
+	file.isClassStart();
 	getGameManager()->load(&file);
 
 	file.close();
@@ -250,7 +251,7 @@ void CProjectItem::clear() {
 }
 
 CProjectItem *CProjectItem::loadData(SimpleFile *file) {
-	if (!file->IsClassStart())
+	if (!file->isClassStart())
 		return nullptr;
 
 	CProjectItem *root = nullptr;
@@ -291,8 +292,8 @@ CProjectItem *CProjectItem::loadData(SimpleFile *file) {
 			item->load(file);
 		}
 
-		file->IsClassStart();
-	} while (file->IsClassStart());
+		file->isClassStart();
+	} while (file->isClassStart());
 
 	return root;
 }

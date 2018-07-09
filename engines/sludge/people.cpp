@@ -22,6 +22,7 @@
 
 #include "sludge/allfiles.h"
 #include "sludge/floor.h"
+#include "sludge/function.h"
 #include "sludge/graphics.h"
 #include "sludge/loadsave.h"
 #include "sludge/moreio.h"
@@ -75,10 +76,10 @@ PersonaAnimation::PersonaAnimation(int num, VariableStack *&stacky) {
 		} else if (stacky->thisVar.varType == SVT_FUNC) {
 			frames[a].noise = -stacky->thisVar.varData.intValue;
 		} else if (stacky->thisVar.varType == SVT_STACK) {
-			getValueType(frameNum, SVT_INT, stacky->thisVar.varData.theStack->first->thisVar);
-			getValueType(howMany, SVT_INT, stacky->thisVar.varData.theStack->first->next->thisVar);
+			stacky->thisVar.varData.theStack->first->thisVar.getValueType(frameNum, SVT_INT);
+			stacky->thisVar.varData.theStack->first->next->thisVar.getValueType(howMany, SVT_INT);
 		} else {
-			getValueType(frameNum, SVT_INT, stacky->thisVar);
+			stacky->thisVar.getValueType(frameNum, SVT_INT);
 			howMany = 1;
 		}
 		trimStack(stacky);

@@ -101,6 +101,28 @@ int16 RivenStack::getIdFromName(RivenNameResource nameResource, const Common::St
 	}
 }
 
+void RivenStack::registerName(RivenNameResource nameResource, uint16 nameId, const Common::String &name) {
+	switch (nameResource) {
+		case kVariableNames:
+			_varNames.registerName(nameId, name);
+			break;
+		case kExternalCommandNames:
+			_externalCommandNames.registerName(nameId, name);
+			break;
+		case kStackNames:
+			_stackNames.registerName(nameId, name);
+			break;
+		case kCardNames:
+			_cardNames.registerName(nameId, name);
+			break;
+		case kHotspotNames:
+			_hotspotNames.registerName(nameId, name);
+			break;
+		default:
+			error("Unknown name resource %d", nameResource);
+	}
+}
+
 void RivenStack::loadCardIdMap() {
 	Common::SeekableReadStream *rmapStream = _vm->getResource(ID_RMAP, 1);
 
@@ -184,16 +206,16 @@ void RivenStack::runDemoBoundaryDialog() {
 	dialog.runModal();
 }
 
-void RivenStack::runEndGame(uint16 videoCode, uint32 delay) {
+void RivenStack::runEndGame(uint16 videoCode, uint32 delay, uint32 videoFrameCountOverride) {
 	_vm->_sound->stopAllSLST();
 	RivenVideo *video = _vm->_video->openSlot(videoCode);
 	video->enable();
 	video->play();
 	video->setLooping(false);
-	runCredits(videoCode, delay);
+	runCredits(videoCode, delay, videoFrameCountOverride);
 }
 
-void RivenStack::runCredits(uint16 video, uint32 delay) {
+void RivenStack::runCredits(uint16 video, uint32 delay, uint32 videoFrameCountOverride) {
 	// Initialize our credits state
 	_vm->_cursor->hideCursor();
 	_vm->_gfx->beginCredits();
@@ -201,9 +223,24 @@ void RivenStack::runCredits(uint16 video, uint32 delay) {
 
 	RivenVideo *videoPtr = _vm->_video->getSlot(video);
 
+	int32 frameCount;
+	if (_vm->getLanguage() == Common::PL_POL && videoFrameCountOverride != 0) {
+		// In the Polish version, the ending videos are not encoded the same way
+		// as with the other languages. In the other versions, the video track
+		// ends after a while, but the audio track keeps going while the credits
+		// are shown.
+		// In the Polish version, the video track keeps going until the end
+		// of the file, but contains only white frames. This workaround stops
+		// displaying the video track just before the first white frame.
+		frameCount = videoFrameCountOverride;
+	} else {
+		frameCount = videoPtr->getFrameCount();
+	}
+
 	while (!_vm->hasGameEnded() && _vm->_gfx->getCurCreditsImage() <= 320) {
-		if (videoPtr->getCurFrame() >= (int32)videoPtr->getFrameCount() - 1) {
+		if (videoPtr->getCurFrame() >= frameCount - 1) {
 			if (nextCreditsFrameStart == 0) {
+				videoPtr->disable();
 				// Set us up to start after delay ms
 				nextCreditsFrameStart = _vm->getTotalPlayTime() + delay;
 			} else if (_vm->getTotalPlayTime() >= nextCreditsFrameStart) {
@@ -507,6 +544,16 @@ int16 RivenNameList::getNameId(const Common::String &name) const {
 	}
 
 	return -1;
+}
+
+void RivenNameList::registerName(uint16 nameId, const Common::String &name) {
+	if (nameId >= _names.size()) {
+		_names.resize(nameId + 1);
+	}
+
+	_names[nameId] = name;
+
+	// We don't add the name to _index, getNameId does not work for names added this way
 }
 
 namespace RivenStacks {

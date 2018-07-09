@@ -32,7 +32,7 @@ Resources *g_resources;
 Resources::Resources() {
 	g_resources = this;
 	g_vm->_files->setGameCc(1);
-	
+
 	_globalSprites.load("global.icn");
 	if (g_vm->getGameID() == GType_Swords)
 		_logoSprites.load("logo.int");
@@ -340,6 +340,7 @@ void Resources::loadData() {
 	file.syncString(SELECT_CLASS_BEFORE_SAVING);
 	file.syncString(EXCHANGE_ATTR_WITH);
 	file.syncNumbers((int *)NEW_CHAR_SKILLS, 10);
+	file.syncNumbers((int *)NEW_CHAR_SKILLS_OFFSET, 10);
 	file.syncNumbers((int *)NEW_CHAR_SKILLS_LEN, 10);
 	file.syncNumbers((int *)NEW_CHAR_RACE_SKILLS, 10);
 	file.syncNumbers((int *)RACE_MAGIC_RESISTENCES, 5);

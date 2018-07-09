@@ -77,15 +77,18 @@ class Room;
 class Pscr;
 
 enum {
-	GF_TRANSLATED = 1 << 0
+	GF_TRANSLATED = 1 << 0,
+	GF_EXTRACTED  = 1 << 1,
+	GF_NOVOICES   = 1 << 2
 };
 
 struct SavegameHeader {
 	uint8 version;
 	Common::String saveName;
 	Graphics::Surface *thumbnail;
-	int saveYear, saveMonth, saveDay;
-	int saveHour, saveMinutes;
+	int16 saveYear, saveMonth, saveDay;
+	int16 saveHour, saveMinutes;
+	uint32 playTime;
 };
 
 #define kSavegameStrSize 14
@@ -275,6 +278,8 @@ protected:
 public:
 	PrinceEngine(OSystem *syst, const PrinceGameDescription *gameDesc);
 	virtual ~PrinceEngine();
+
+	bool scummVMSaveLoadDialog(bool isSave);
 
 	virtual bool hasFeature(EngineFeature f) const;
 	virtual void pauseEngineIntern(bool pause);

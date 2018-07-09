@@ -81,7 +81,7 @@ protected:
 	ButtonWidget *_soundFontButton;
 	StaticTextWidget *_soundFont;
 	ButtonWidget *_soundFontClearButton;
-	
+
 	virtual void build();
 	virtual void clean();
 	void rebuild();
@@ -115,7 +115,7 @@ protected:
 	int _pathsTabId;
 
 private:
-	
+
 	//
 	// Control controls
 	//
@@ -138,12 +138,14 @@ private:
 	bool _enableGraphicSettings;
 	StaticTextWidget *_gfxPopUpDesc;
 	PopUpWidget *_gfxPopUp;
+	StaticTextWidget *_stretchPopUpDesc;
+	PopUpWidget *_stretchPopUp;
 	CheckboxWidget *_fullscreenCheckbox;
 	CheckboxWidget *_filteringCheckbox;
 	CheckboxWidget *_aspectCheckbox;
 	StaticTextWidget *_renderModePopUpDesc;
 	PopUpWidget *_renderModePopUp;
-	
+
 	//
 	// Shader controls
 	//
